@@ -98,8 +98,10 @@ iD.ui.MapData = function(context) {
             fillList.call(drawList, fills, 'radio', 'area_fill', setFill, showsFill);
 
             var hasGpx = context.background().hasGpxLayer(),
+                hasConflation = context.background().hasConflationLayer(),
                 showsGpx = context.background().showsGpxLayer(),
-                showsMapillary = context.background().showsMapillaryLayer();
+                showsMapillary = context.background().showsMapillaryLayer(),
+                showsConflation = context.background().showsConflationLayer();
 
             gpxLayerItem
                 .classed('active', showsGpx)
@@ -111,6 +113,13 @@ iD.ui.MapData = function(context) {
                 .classed('active', showsMapillary)
                 .selectAll('input')
                 .property('checked', showsMapillary);
+
+            conflationLayerItem
+                .classed('active', showsConflation)
+                .selectAll('input')
+                .property('disabled', !hasConflation)
+                .property('checked', showsConflation);
+
         }
 
         function hidePanel() { setVisible(false); }
@@ -260,6 +269,55 @@ iD.ui.MapData = function(context) {
 
         label.append('span')
             .text(t('gpx.local_layer'));
+
+        // conflation
+        var conflationLayerItem = layerContainer.append('ul')
+            .style('display', iD.detect().filedrop ? 'block' : 'none')
+            .attr('class', 'layer-list')
+            .append('li')
+            .classed('layer-toggle-conflation', true);
+
+        conflationLayerItem.append('button')
+            .attr('class', 'layer-extent')
+            .call(bootstrap.tooltip()
+                .title(t('conflation.zoom'))
+                .placement('left'))
+            .on('click', function() {
+                d3.event.preventDefault();
+                d3.event.stopPropagation();
+                context.background().zoomToGpxLayer();
+            })
+            .append('span')
+            .attr('class', 'icon geolocate');
+
+        conflationLayerItem.append('button')
+            .attr('class', 'layer-browse')
+            .call(bootstrap.tooltip()
+                .title(t('conflation.browse'))
+                .placement('left'))
+            .on('click', function() {
+                d3.select(document.createElement('input'))
+                    .attr('type', 'file')
+                    .on('change', function() {
+                        context.background().conflationLayerFiles(d3.event.target.files);
+                    })
+                    .node().click();
+            })
+            .append('span')
+            .attr('class', 'icon geocode');
+
+        label = conflationLayerItem.append('label')
+            .call(bootstrap.tooltip()
+                .title(t('conflation.drag_drop'))
+                .placement('top'));
+
+        label.append('input')
+            .attr('type', 'checkbox')
+            .property('disabled', true)
+            .on('change', clickGpx);
+
+        label.append('span')
+            .text(t('conflation.local_layer'));
 
 
         // area fills
