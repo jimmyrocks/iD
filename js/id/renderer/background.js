@@ -4,6 +4,7 @@ iD.Background = function(context) {
             .projection(context.projection),
         gpxLayer = iD.GpxLayer(context, dispatch)
             .projection(context.projection),
+        conflationLayer = iD.ConflationLayer(context),
         mapillaryLayer = iD.MapillaryLayer(context),
         overlayLayers = [];
 
@@ -130,6 +131,16 @@ iD.Background = function(context) {
 
     background.showsGpxLayer = function() {
         return background.hasGpxLayer() && gpxLayer.enable();
+    };
+
+    background.hasConflationLayer = function() {
+        // return !_.isEmpty(gpxLayer.geojson());
+      // TODO: draw the conflation layer to the background
+        return null;
+    };
+
+    background.showsConflationLayer = function() {
+        return background.hasConflationLayer() && conflationLayer.enable();
     };
 
     function toDom(x) {
