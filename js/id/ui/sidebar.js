@@ -8,6 +8,7 @@ iD.ui.Sidebar = function(context) {
             .call(iD.ui.FeatureList(context));
 
         selection.call(iD.ui.Notice(context));
+        selection.call(iD.ui.Conflation(context));
 
         var inspectorWrap = selection.append('div')
             .attr('class', 'inspector-hidden inspector-wrap fr');
