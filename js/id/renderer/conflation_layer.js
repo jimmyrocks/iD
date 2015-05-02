@@ -1,4 +1,4 @@
-iD.ConfaltionLayer = function() {
+iD.ConflationLayer = function() {
     var projection,
         gj = {},
         enable = true,
