@@ -390,7 +390,7 @@ en:
     title: "Photo Overlay (Mapillary)"
     view_on_mapillary: "View this image on Mapillary"
   conflation:
-    tooltip: "Run conflation tasks directly withing iD"
+    tooltip: "Run conflation tasks directly within iD"
     title: "Conflation Tools"
   help:
     title: "Help"
