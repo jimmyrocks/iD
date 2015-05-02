@@ -133,13 +133,8 @@ iD.Background = function(context) {
         return background.hasGpxLayer() && gpxLayer.enable();
     };
 
-    background.hasConflationLayer = function() {
-        // return !_.isEmpty(gpxLayer.geojson());
-      // TODO: draw the conflation layer to the background
-        return null;
-    };
-
     background.showsConflationLayer = function() {
+        console.log('show the conflation layer here');
         return background.hasConflationLayer() && conflationLayer.enable();
     };
 
