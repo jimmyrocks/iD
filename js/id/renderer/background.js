@@ -134,8 +134,16 @@ iD.Background = function(context) {
     };
 
     background.showsConflationLayer = function() {
-        console.log('show the conflation layer here');
         return background.hasConflationLayer() && conflationLayer.enable();
+    };
+
+    background.hasConflationLayer = function() {
+        return conflationLayer.enable();
+    };
+
+    background.toggleConflationLayer = function() {
+        conflationLayer.enable(!conflationLayer.enable());
+        dispatch.change();
     };
 
     function toDom(x) {
