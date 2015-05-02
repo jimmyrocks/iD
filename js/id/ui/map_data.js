@@ -47,6 +47,12 @@ iD.ui.MapData = function(context) {
             update();
         }
 
+        function clickConflation() {
+            context.background().toggleConflationLayer();
+            update();
+        }
+
+
         function drawList(selection, data, type, name, change, active) {
             var items = selection.selectAll('li')
                 .data(data);
@@ -271,7 +277,8 @@ iD.ui.MapData = function(context) {
         // conflation
         var conflationLayerItem = layerContainer.append('ul')
             .attr('class', 'layer-list')
-            .append('li');
+            .append('li')
+            .classed('layer-toggle-conflation', true);
 
         var label = conflationLayerItem.append('label')
             .call(bootstrap.tooltip()
@@ -280,7 +287,7 @@ iD.ui.MapData = function(context) {
 
         label.append('input')
             .attr('type', 'checkbox')
-            .on('change', clickMapillary);
+            .on('change', clickConflation);
 
         label.append('span')
             .text(t('conflation.title'));
