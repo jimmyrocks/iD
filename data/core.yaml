@@ -389,6 +389,9 @@ en:
     tooltip: "Street-level photos from Mapillary"
     title: "Photo Overlay (Mapillary)"
     view_on_mapillary: "View this image on Mapillary"
+  conflation:
+    tooltip: "Run conflation tasks directly withing iD"
+    title: "Conflation Tools"
   help:
     title: "Help"
     help: |
