@@ -141,8 +141,8 @@ iD.Background = function(context) {
         return conflationLayer.enable();
     };
 
-    background.toggleConflationLayer = function() {
-        conflationLayer.enable(!conflationLayer.enable());
+    background.toggleConflationLayer = function(toggleTo) {
+        conflationLayer.enable(typeof toggleTo === 'boolean' ? toggleTo : !conflationLayer.enable());
         dispatch.change();
     };
 
