@@ -1,21 +1,26 @@
 iD.ConflationLayer = function() {
-  var enable =  true;
+  var enable = true,
+    geojson;
 
   function render(_) {
+    console.log('0 set to', _);
+    console.log('This is where we do stuff with that sidebar!', _);
     // render.enable(true);
   }
 
   render.enable = function(_) {
-    console.log('enable?', _);
+    console.log('a set to', _);
     if (!arguments.length) return enable;
     enable = _;
-    console.log('returning', _);
+    console.log('b set to', _);
     return render;
   };
 
-  render.disable = function(_) {
-    if (!arguments.length) return enable;
-    return render.enable(!_);
+  render.geojson = function(_) {
+    console.log('1 set to', _);
+    if (!arguments.length) return geojson;
+    geojson = _;
+    return render;
   };
 
   render.id = 'layer-conflation';
