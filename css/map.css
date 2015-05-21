@@ -1154,6 +1154,17 @@ g.turn circle {
     pointer-events: visibleStroke;
 }
 
+/* Conflation Paths */
+div.layer-conflation{
+    pointer-events: none;
+}
+
+path.conflation{
+    stroke: #FF84E7;
+    stroke-width: 1.5;
+    fill: none;
+}
+
 /* GPX Paths */
 div.layer-gpx {
     pointer-events: none;
