@@ -4,7 +4,8 @@ iD.Background = function(context) {
             .projection(context.projection),
         gpxLayer = iD.GpxLayer(context, dispatch)
             .projection(context.projection),
-        conflationLayer = iD.ConflationLayer(context),
+        conflationLayer = iD.ConflationLayer(context, dispatch)
+            .projection(context.projection),
         mapillaryLayer = iD.MapillaryLayer(context),
         overlayLayers = [];
 
@@ -93,6 +94,15 @@ iD.Background = function(context) {
             .attr('class', 'layer-layer layer-mapillary');
 
         mapillary.call(mapillaryLayer);
+
+        var conflation = selection.selectAll('.layer-conflation')
+            .data([0]);
+
+        conflation.enter().insert('div')
+            .attr('class', 'layer-layer layer-conflation');
+
+        conflation.call(conflationLayer);
+
     }
 
     background.sources = function(extent) {
@@ -104,6 +114,7 @@ iD.Background = function(context) {
     background.dimensions = function(_) {
         baseLayer.dimensions(_);
         gpxLayer.dimensions(_);
+        conflationLayer.dimensions(_);
         mapillaryLayer.dimensions(_);
 
         overlayLayers.forEach(function(layer) {
@@ -144,6 +155,11 @@ iD.Background = function(context) {
     background.toggleConflationLayer = function(toggleTo) {
         conflationLayer.enable(typeof toggleTo === 'boolean' ? toggleTo : !conflationLayer.enable());
         dispatch.change();
+    };
+
+    background.setConflationGeoJSON = function (gj) {
+      conflationLayer.geojson(gj);
+      dispatch.change();
     };
 
     function toDom(x) {
