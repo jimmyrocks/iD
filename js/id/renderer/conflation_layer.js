@@ -1,25 +1,74 @@
-iD.ConflationLayer = function() {
-  var enable = true,
-    geojson;
+iD.ConflationLayer = function(context) {
+  var projection,
+    enable = false,
+    gj = {},
+    svg;
 
-  function render(_) {
-    console.log('0 set to', _);
-    console.log('This is where we do stuff with that sidebar!', _);
-    // render.enable(true);
+  function render(selection) {
+    svg = selection.selectAll('svg').data([render]);
+    svg.enter().append('svg');
+    svg.style('display', enable ? 'block' : 'none');
+    var paths = svg.selectAll('path').data([gj]);
+
+    paths
+      .enter()
+      .append('path')
+      .attr('class', 'conflation');
+
+    var path = d3.geo.path()
+      .projection(projection);
+
+    paths
+      .attr('d', path);
+
+    if (typeof gj.features !== 'undefined') {
+      svg
+        .selectAll('text')
+        .remove();
+
+      svg
+        .selectAll('path')
+        .data(gj.features)
+        .enter()
+        .append('text')
+        .attr('class', 'conflation')
+        .text(function(d) {
+          return d.properties.desc || d.properties.name;
+        })
+        .attr('x', function(d) {
+          var centroid = path.centroid(d);
+          return centroid[0] + 5;
+        })
+        .attr('y', function(d) {
+          var centroid = path.centroid(d);
+          return centroid[1];
+        });
+    }
   }
 
-  render.enable = function(_) {
-    console.log('a set to', _);
-    if (!arguments.length) return enable;
-    enable = _;
-    console.log('b set to', _);
+
+  render.projection = function(_) {
+    if (!arguments.length) return projection;
+    projection = _;
     return render;
   };
 
+
   render.geojson = function(_) {
-    console.log('1 set to', _);
-    if (!arguments.length) return geojson;
-    geojson = _;
+    if (!arguments.length) return gj;
+    gj = _;
+    return render;
+  };
+
+  render.dimensions = function(_) {
+    if (!arguments.length) return svg.dimensions();
+    svg.dimensions(_);
+    return render;
+  };
+
+  render.enable = function(_) {
+    if (!arguments.length) return enable;
+    enable = _;
     return render;
   };
 
