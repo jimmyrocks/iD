@@ -35,6 +35,7 @@ iD.ui.Conflation = function(context) {
     welcomeScreen.append('h2').text('Welcome to MapRoulette Conflation!');
     var pickAChallenge = body.append('div').text('Pick a challenge: ');
     var taskInstruction = body.append('div');
+    var buttonArea = body.append('div').attr('class', 'btnArea');
 
     var options, change = function() {
       var selectedIndex = challengeDropDown.property('selectedIndex'),
@@ -44,18 +45,54 @@ iD.ui.Conflation = function(context) {
         taskInstruction.text(r.instruction);
         welcomeScreen.style('display', 'none');
         d3.json(taskUrl + '/' + r.identifier + '/geometries', function(ge, gr) {
+
+          // Probably a new function or so
           var osmid;
           if (gr.features[0].properties.osmid) {
             osmid = gr.features[0].properties.osmid;
+            osmid = osmid ? 'w' + osmid : 'w-1'; //TODO: don't always assume way
             gr.features.splice(0, 1);
           }
+
           // draw all other features to draw
           context.background().setConflationGeoJSON(gr);
           if (osmid) {
-            context.zoomToEntity('w' + osmid, true);
+            context.zoomToEntity(osmid, true);
           } else {
             context.map().centerZoom(d3.geo.centroid(gr), context.map().zoom());
           }
+
+          // Draw some buttons
+          var buttons = [{
+            'id': osmid,
+            'text': 'ok',
+            'action': context.perform,
+            'params': function(newId) {
+              return [iD.actions.Conflate(newId, context.projection, gr), newId];
+            }
+          }];
+          buttonArea.selectAll('button').data([]).exit().remove();
+          buttonArea.selectAll('button').data(buttons).enter()
+            .append('button')
+            .text(function(d) {
+              return d.text;
+            })
+            .on('click', function(d) {
+              // Add the osmid if it doesn't exist
+              if (!d.id) {
+                var way = iD.Way({
+                  tags: {
+                    area: 'yes'
+                  }
+                }); //TODO more than just areas
+                context.perform(iD.actions.AddEntity(way));
+                d.id = way.id;
+              }
+
+              d.action.apply(this, d.params(d.id));
+            });
+
+          //
         });
       });
 
