@@ -505,6 +505,14 @@ button.save.has-count .count::before {
     border-radius: 3px;
 }
 
+.icon-rotate-180 {
+    -webkit-transform: rotate(180deg);
+    -moz-transform: rotate(180deg);
+    -ms-transform: rotate(180deg);
+    -o-transform: rotate(180deg);
+    transform: rotate(180deg);
+}
+
 /* Definitions for every icon */
 .icon.alert     { background-position:   0 0;}
 .icon.point,
@@ -712,7 +720,6 @@ a:hover .icon.out-link   { background-position: -500px -14px;}
 .inspector-body {
     overflow-y: scroll;
     overflow-x: hidden;
-    position: absolute;
     right: 0;
     left: 0;
     bottom: 0;
@@ -2792,30 +2799,35 @@ img.wiki-image {
 /* Exceptions for tooltip layouts */
 
 /* make tooltips in panels dark */
+.conflation-panel .tooltip.top.tooltip-arrow,
 .map-overlay .tooltip.top .tooltip-arrow,
 .entity-editor-pane .tooltip.top .tooltip-arrow,
 .warning-section .tooltip.top .tooltip-arrow {
     border-top-color: #000;
 }
 
+.conflation-panel .tooltip.bottom.tooltip-arrow,
 .map-overlay .tooltip.bottom .tooltip-arrow,
 .entity-editor-pane .tooltip.bottom .tooltip-arrow,
 .warning-section .tooltip.bottom .tooltip-arrow {
     border-bottom-color: #000;
 }
 
+.conflation-panel .tooltip.left .tooltip-arrow,
 .map-overlay .tooltip.left .tooltip-arrow,
 .entity-editor-pane .tooltip.left .tooltip-arrow,
 .warning-section .tooltip.left .tooltip-arrow {
     border-left-color: #000;
 }
 
+.conflation-panel .tooltip.right .tooltip-arrow,
 .map-overlay .tooltip.right .tooltip-arrow,
 .entity-editor-pane .tooltip.right .tooltip-arrow,
 .warning-section .tooltip.right .tooltip-arrow {
     border-right-color: #000;
 }
 
+.conflation-panel .tooltip-inner,
 .map-overlay .tooltip-inner,
 .map-overlay .keyhint-wrap,
 .entity-editor-pane .tooltip-inner,
@@ -2823,6 +2835,21 @@ img.wiki-image {
     background: #000;
     color: #ccc;
 }
+
+.conflation-pane .btnArea button {
+  border-radius: 3px;
+  width: 75%;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #000;
+  background: #E8EBFF;
+}
+
+.conflation-pane .btnArea div {
+  padding: 2px;
+  text-align: center;
+}
+
 /* commit warning tooltips need to be closer */
 .warning-section .tooltip.top {
     margin-top: -5px;
