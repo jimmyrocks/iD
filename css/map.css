@@ -1165,6 +1165,10 @@ path.conflation{
     fill: none;
 }
 
+div.conflation-panel {
+  margin-left: 5px;
+}
+
 /* GPX Paths */
 div.layer-gpx {
     pointer-events: none;
