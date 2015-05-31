@@ -4,46 +4,151 @@ iD.ui.Conflation = function(context) {
   var apiServer = 'localhost:25000';
 
   function conflation(selection) {
+
+    // Build the wrapper for the conflation tasks
     var wrapper = selection
       .append('div')
-      .attr('class', 'conflation-pane');
+      .attr('class', 'conflation-pane'),
 
-    var header = wrapper
+      // Add a header so people know what the area is for
+      header = wrapper
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'header fillL'),
 
-    header
-      .append('button')
-      .attr('class', 'fr')
-      .on('click', function() {
-        context.background().toggleConflationLayer(false);
-      })
-      .append('span')
-      .attr('class', 'icon close');
-
-    header
-      .append('h3')
-      .text(t('conflation.title'));
-
-    var body = wrapper
+      // Add a body area (where all the tools can be found)
+      body = wrapper
       .append('div')
-      .attr('class', 'header fillL');
+      .style('height', 'inherit')
+      .style('background', '#F6F6F6')
+      .attr('id', 'conflation-body')
+      .attr('class', 'header fillL'),
 
+      // The area for the information about the task
+      taskInfo = body
+      .append('div')
+      .attr('class', 'conflation-panel'),
 
-    var welcomeScreen = body.append('div');
+      // Dropdown box
+      pickAChallenge = body
+      .append('div')
+      .attr('class', 'conflation-panel')
+      .style('display', 'none')
+      .text('Pick a challenge: '),
 
-    welcomeScreen.append('h2').text('Welcome to MapRoulette Conflation!');
-    var pickAChallenge = body.append('div').text('Pick a challenge: ');
-    var taskInstruction = body.append('div');
-    var buttonArea = body.append('div').attr('class', 'btnArea');
+      // Area for instructions from the task
+      taskInstruction = body
+      .append('div')
+      .attr('class', 'conflation-panel'),
 
-    var options, change = function() {
-      var selectedIndex = challengeDropDown.property('selectedIndex'),
-        data = options[0][selectedIndex].__data__;
-      var taskUrl = 'http://' + apiServer + '/api/challenge/' + data.slug + '/task';
+      // Area for the Conflation task buttons
+      buttonArea = body
+      .append('div')
+      .attr('class', 'btnArea'),
+
+      // The dropdown box itself and the function that runs when it is changed
+      options,
+      change = function() {
+        var selectedIndex = challengeDropDown.property('selectedIndex'),
+          data = options[0][selectedIndex].__data__;
+        setChallenge(data);
+      },
+      challengeDropDown = pickAChallenge.append('select').on('change', change),
+
+      tooltip = function(text) {
+        return bootstrap.tooltip()
+          .placement('left')
+          .html(true)
+          .title(text);
+      };
+
+    function buildDisplay() {
+      // Create the header
+      header
+        .append('button')
+        .attr('class', 'fr')
+        .on('click', function() {
+          context.background().toggleConflationLayer(false);
+        })
+        .append('span')
+        .attr('class', 'icon close');
+
+      var headerSpan = header
+        .append('div')
+        .on('click', (function() {
+          console.log('clicky');
+          selection.selectAll('#conflation-body').classed('inspector-hidden', false);
+          selection.selectAll('#more-content').classed('inspector-hidden', true);
+        }));
+
+      headerSpan
+        .append('span')
+        .attr('class', 'icon save icon-rotate-180')
+        .attr('id', 'more-content')
+        .style('float', 'left')
+        .style('margin-top', '20px');
+
+      headerSpan
+        .append('h3')
+        .text(t('conflation.title'));
+
+      // Get the list of challenges
+      d3.json('http://' + apiServer + '/api/challenges', function(e, r) {
+        if (!e) {
+          // Populate the dropdown
+          options = challengeDropDown.selectAll('option')
+            .data(r);
+
+          options
+            .enter()
+            .append('option')
+            .value(function(d) {
+              return d.slug;
+            })
+            .text(function(d) {
+              return d.title;
+            });
+          // Default to the first challenge in the list and only change challenges if the user asks to change 
+          setChallenge(r[0]);
+        }
+      });
+    }
+
+    function disableConflation() {
+      wrapper.style('display', context.background().hasConflationLayer() ? 'block' : 'none');
+    }
+
+    function setChallenge(challenge) {
+      console.log('setting challenge', challenge);
+      // Populate the taskInfo box:
+      taskInfo.selectAll('div').data([]).exit().remove();
+      var header = taskInfo.selectAll('div').data([challenge]).enter()
+        .append('div');
+
+      header.append('h3').text(function(d) {
+          return d.title;
+        })
+        .append('span')
+        .style('float', 'right')
+        .style('margin-right', '-10px')
+        .call(tooltip(function(d) {
+          return d.help + '<br/> Difficulty: ' + d.difficulty;
+        }))
+        .append('span').attr('class', 'icon inspect');
+
+      header.append('div').style('margin-left', '5px').html(function(d) {
+        return '<span style="font-weight: bold;">Description</span>: ' + d.description + '<br/><span style="font-weight: bold;">Blurb</span>: ' + d.blurb;
+      });
+      header.append('hr').style('width', '75%');
+
+      // Get a random task for this challenge
+      getNewTask(challenge.slug);
+    }
+
+    function getNewTask(slug) {
+      var taskUrl = 'http://' + apiServer + '/api/challenge/' + slug + '/task';
+
       d3.json(taskUrl, function(e, r) {
-        taskInstruction.text(r.instruction);
-        welcomeScreen.style('display', 'none');
+        taskInstruction.style('margin-left', '5px').html('<span style="font-weight: bold;">Instructions: </span>' + r.instruction);
         d3.json(taskUrl + '/' + r.identifier + '/geometries', function(ge, gr) {
 
           // Probably a new function or so
@@ -64,61 +169,43 @@ iD.ui.Conflation = function(context) {
 
           // Draw some buttons
           var buttons = [{
+            'text': 'This is not an error'
+          }, {
+            'text': 'Skip'
+          }, {
+            'text': 'I fixed it'
+          }, {
             'id': osmid,
-            'text': 'ok',
+            'import': true,
+            'text': 'Import / Redraw',
             'action': context.perform,
             'params': function(newId) {
               return [iD.actions.Conflate(newId, context.projection, gr), newId];
             }
           }];
-          buttonArea.selectAll('button').data([]).exit().remove();
-          buttonArea.selectAll('button').data(buttons).enter()
-            .append('button')
+          buttonArea.selectAll('div').data([]).exit().remove();
+          buttonArea.selectAll('div').data(buttons).enter()
+            .append('div').append('button')
             .text(function(d) {
               return d.text;
             })
             .on('click', function(d) {
-              // Add the osmid if it doesn't exist
-              if (!d.id) {
-                var way = iD.Way({
-                  tags: {
-                    area: 'yes'
-                  }
-                }); //TODO more than just areas
-                context.perform(iD.actions.AddEntity(way));
-                d.id = way.id;
+              if (d.import) {
+                // Add the osmid if it doesn't exist
+                if (!d.id) {
+                  var way = iD.Way({
+                    tags: {
+                      area: 'yes'
+                    }
+                  }); //TODO more than just areas
+                  context.perform(iD.actions.AddEntity(way));
+                  d.id = way.id;
+                }
+                d.action.apply(this, d.params(d.id));
               }
-
-              d.action.apply(this, d.params(d.id));
             });
-
-          //
         });
       });
-
-    };
-    var challengeDropDown = pickAChallenge.append('select').on('change', change);
-
-    d3.json('http://' + apiServer + '/api/challenges', function(e, r) {
-      if (!e) {
-        options = challengeDropDown.selectAll('option')
-          .data(r);
-
-        options
-          .enter()
-          .append('option')
-          .value(function(d) {
-            return d.slug;
-          })
-          .text(function(d) {
-            return d.title;
-          });
-      }
-    });
-
-
-    function disableConflation() {
-      wrapper.style('display', context.background().hasConflationLayer() ? 'block' : 'none');
     }
 
     context.background()
@@ -126,6 +213,7 @@ iD.ui.Conflation = function(context) {
 
     disableConflation();
 
+    buildDisplay();
   }
 
   return d3.rebind(conflation, dispatch, 'on');
