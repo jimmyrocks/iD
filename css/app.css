@@ -2838,6 +2838,11 @@ img.wiki-image {
     color: #ccc;
 }
 
+.conflation-panel .tooltip-inner {
+  white-space: normal;
+  text-align: left;
+}
+
 .conflation-pane .btnArea button {
   border-radius: 3px;
   width: 75%;
