@@ -19,7 +19,7 @@ iD.ui.Sidebar = function(context) {
             if (!current && id) {
                 featureListWrap.classed('inspector-hidden', true);
                 conflationList.classed('inspector-hidden', true);
-                conflationContent.classed('inspector-hidden', false);
+                conflationContent.classed('icon-rotate-180', true);
                 inspectorWrap.classed('inspector-hidden', false)
                     .classed('inspector-hover', true);
 
@@ -33,7 +33,7 @@ iD.ui.Sidebar = function(context) {
             } else if (!current) {
                 featureListWrap.classed('inspector-hidden', false);
                 conflationList.classed('inspector-hidden', false);
-                conflationContent.classed('inspector-hidden', true);
+                conflationContent.classed('icon-rotate-180', false);
                 inspectorWrap.classed('inspector-hidden', true);
                 inspector.state('hide');
             }
@@ -45,7 +45,7 @@ iD.ui.Sidebar = function(context) {
             if (!current && id) {
                 featureListWrap.classed('inspector-hidden', true);
                 conflationList.classed('inspector-hidden', true);
-                conflationContent.classed('inspector-hidden', false);
+                conflationContent.classed('icon-rotate-180', true);
                 inspectorWrap.classed('inspector-hidden', false)
                     .classed('inspector-hover', false);
 
@@ -60,7 +60,7 @@ iD.ui.Sidebar = function(context) {
             } else if (!current) {
                 featureListWrap.classed('inspector-hidden', false);
                 conflationList.classed('inspector-hidden', false);
-                conflationContent.classed('inspector-hidden', true);
+                conflationContent.classed('icon-rotate-180', false);
                 inspectorWrap.classed('inspector-hidden', true);
                 inspector.state('hide');
             }
@@ -69,7 +69,7 @@ iD.ui.Sidebar = function(context) {
         sidebar.show = function(component) {
             featureListWrap.classed('inspector-hidden', true);
             conflationList.classed('inspector-hidden', true);
-            conflationContent.classed('inspector-hidden', false);
+            conflationContent.classed('icon-rotate-180', true);
             inspectorWrap.classed('inspector-hidden', true);
             if (current) current.remove();
             current = selection.append('div')
@@ -80,7 +80,7 @@ iD.ui.Sidebar = function(context) {
         sidebar.hide = function() {
             featureListWrap.classed('inspector-hidden', false);
             conflationList.classed('inspector-hidden', false);
-            conflationContent.classed('inspector-hidden', true);
+            conflationContent.classed('icon-rotate-180', false);
             inspectorWrap.classed('inspector-hidden', true);
             if (current) current.remove();
             current = null;
