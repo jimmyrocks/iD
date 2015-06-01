@@ -23,6 +23,12 @@ iD.ui.Conflation = function(context) {
       .attr('id', 'conflation-body')
       .attr('class', 'header fillL'),
 
+      // Add a spinner while the body content loads
+      spinner = body
+      .append('span')
+      .append('img')
+      .attr('src', 'dist/img/mini-loader.gif'),
+
       // The area for the information about the task
       taskInfo = body
       .append('div')
@@ -62,6 +68,7 @@ iD.ui.Conflation = function(context) {
       };
 
     function buildDisplay() {
+      spinner.style('display', 'block');
       // Create the header
       header
         .append('button')
@@ -74,15 +81,16 @@ iD.ui.Conflation = function(context) {
 
       var headerSpan = header
         .append('div')
+        .style('cursor', 'pointer')
         .on('click', (function() {
-          console.log('clicky');
-          selection.selectAll('#conflation-body').classed('inspector-hidden', false);
-          selection.selectAll('#more-content').classed('inspector-hidden', true);
+          var newMode = !selection.selectAll('#conflation-body').classed('inspector-hidden');
+          selection.selectAll('#conflation-body').classed('inspector-hidden', newMode);
+          selection.selectAll('#more-content').classed('icon-rotate-180', newMode);
         }));
 
       headerSpan
         .append('span')
-        .attr('class', 'icon save icon-rotate-180')
+        .attr('class', 'icon save')
         .attr('id', 'more-content')
         .style('float', 'left')
         .style('margin-top', '20px');
@@ -121,10 +129,11 @@ iD.ui.Conflation = function(context) {
       console.log('setting challenge', challenge);
       // Populate the taskInfo box:
       taskInfo.selectAll('div').data([]).exit().remove();
+      pickAChallenge.style('display', 'none');
       var header = taskInfo.selectAll('div').data([challenge]).enter()
         .append('div');
 
-      header.append('h3').text(function(d) {
+      var titleArea = header.append('h3').text(function(d) {
           return d.title;
         })
         .append('span')
@@ -135,6 +144,31 @@ iD.ui.Conflation = function(context) {
         }))
         .append('span').attr('class', 'icon inspect');
 
+      header
+        .append('div')
+        .attr('class', 'btnArea')
+        .append('button')
+        .style('font-size', '10px')
+        .style('top', '-10px')
+        .style('margin-left', '15px')
+        .style('width', '40%')
+        .style('background', '#C8C8C8')
+        .text('Select a different challenge')
+        .on('click', function() {
+          // Mark the current task as skipped
+
+          // Hide this pane
+          titleArea.selectAll('div').data([]).exit().remove();
+          taskInfo.selectAll('div').data([]).exit().remove();
+          taskInstruction.style('display', 'none');
+          buttonArea.selectAll('div').data([]).exit().remove();
+
+
+          // Bring back the pickAChallenge dropdown
+          pickAChallenge.style('display', 'block');
+        });
+
+
       header.append('div').style('margin-left', '5px').html(function(d) {
         return '<span style="font-weight: bold;">Description</span>: ' + d.description + '<br/><span style="font-weight: bold;">Blurb</span>: ' + d.blurb;
       });
@@ -144,12 +178,39 @@ iD.ui.Conflation = function(context) {
       getNewTask(challenge.slug);
     }
 
+    function updateTask(url, payload) {
+      if (payload && payload.action === 'fixed') {
+        // Alert the user to make sure they save!
+        var modal = iD.ui.modal(d3.selectAll('body'));
+
+        modal.select('.modal')
+          .attr('class', 'modal fillL col6');
+        var introModal = modal.select('.content');
+
+        introModal.attr('class', 'cf');
+
+        introModal.append('div')
+          .attr('class', 'modal-section')
+          .append('h3')
+          .text('Remember to save your fixes!');
+
+      }
+      d3.json(url)
+        .header('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8')
+        .send('PUT', 'action=' + payload.action, function() {
+          getNewTask(payload.slug);
+        });
+    }
+
     function getNewTask(slug) {
       var taskUrl = 'http://' + apiServer + '/api/challenge/' + slug + '/task';
 
       d3.json(taskUrl, function(e, r) {
-        taskInstruction.style('margin-left', '5px').html('<span style="font-weight: bold;">Instructions: </span>' + r.instruction);
-        d3.json(taskUrl + '/' + r.identifier + '/geometries', function(ge, gr) {
+        var taskInfoUrl = taskUrl + '/' + r.identifier;
+        taskInstruction.style('display', 'block').style('margin-left', '10px').html('<span style="font-weight: bold;">Instructions: </span>' + r.instruction);
+        d3.json(taskInfoUrl + '/geometries', function(ge, gr) {
+          // Remove the spinner
+          spinner.style('display', 'none');
 
           // Probably a new function or so
           var osmid;
@@ -169,11 +230,29 @@ iD.ui.Conflation = function(context) {
 
           // Draw some buttons
           var buttons = [{
-            'text': 'This is not an error'
+            'text': 'This is not an error',
+            'action': updateTask,
+            'params': [taskInfoUrl, {
+              'action': 'falsepositive',
+              'slug': slug,
+              'label': 'Not an error'
+            }]
           }, {
-            'text': 'Skip'
+            'text': 'Skip',
+            'action': updateTask,
+            'params': [taskInfoUrl, {
+              'action': 'skipped',
+              'slug': slug,
+              'label': 'No'
+            }]
           }, {
-            'text': 'I fixed it'
+            'text': 'I fixed it',
+            'action': updateTask,
+            'params': [taskInfoUrl, {
+              'action': 'fixed',
+              'slug': slug,
+              'label': 'Yes'
+            }]
           }, {
             'id': osmid,
             'import': true,
@@ -202,6 +281,8 @@ iD.ui.Conflation = function(context) {
                   d.id = way.id;
                 }
                 d.action.apply(this, d.params(d.id));
+              } else {
+                d.action.apply(this, d.params);
               }
             });
         });
