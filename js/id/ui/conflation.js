@@ -61,10 +61,11 @@ iD.ui.Conflation = function(context) {
       challengeDropDown = pickAChallenge.append('select').on('change', change),
 
       tooltip = function(text) {
-        return bootstrap.tooltip()
+        var tooltipElement = bootstrap.tooltip()
           .placement('left')
           .html(true)
           .title(text);
+        return tooltipElement;
       };
 
     function buildDisplay() {
@@ -230,6 +231,15 @@ iD.ui.Conflation = function(context) {
 
           // Draw some buttons
           var buttons = [{
+            'id': osmid,
+            'import': true,
+            'text': osmid ? 'Redraw' : 'Import',
+            'action': context.perform,
+              'background': '#FFFFE8',
+            'params': function(newId) {
+              return [iD.actions.Conflate(newId, context.projection, gr), newId];
+            }
+          }, {
             'text': 'This is not an error',
             'action': updateTask,
             'params': [taskInfoUrl, {
@@ -253,18 +263,13 @@ iD.ui.Conflation = function(context) {
               'slug': slug,
               'label': 'Yes'
             }]
-          }, {
-            'id': osmid,
-            'import': true,
-            'text': 'Import / Redraw',
-            'action': context.perform,
-            'params': function(newId) {
-              return [iD.actions.Conflate(newId, context.projection, gr), newId];
-            }
           }];
           buttonArea.selectAll('div').data([]).exit().remove();
           buttonArea.selectAll('div').data(buttons).enter()
             .append('div').append('button')
+            .style('background', function(d) {
+              return d.background || '';
+            })
             .text(function(d) {
               return d.text;
             })
