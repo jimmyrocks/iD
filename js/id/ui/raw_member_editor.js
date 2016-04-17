@@ -8,8 +8,9 @@ iD.ui.RawMemberEditor = function(context) {
 
     function changeRole(d) {
         var role = d3.select(this).property('value');
+        var member = {id: d.id, type: d.type, role: role};
         context.perform(
-            iD.actions.ChangeMember(d.relation.id, _.extend({}, d.id, {role: role}), d.index),
+            iD.actions.ChangeMember(d.relation.id, member, d.index),
             t('operations.change_role.annotation'));
     }
 
@@ -31,6 +32,7 @@ iD.ui.RawMemberEditor = function(context) {
             memberships.push({
                 index: index,
                 id: member.id,
+                type: member.type,
                 role: member.role,
                 relation: entity,
                 member: context.hasEntity(member.id)
@@ -101,8 +103,7 @@ iD.ui.RawMemberEditor = function(context) {
                 .attr('tabindex', -1)
                 .attr('class', 'remove button-input-action member-delete minor')
                 .on('click', deleteMember)
-                .append('span')
-                .attr('class', 'icon delete');
+                .call(iD.svg.Icon('#operation-delete'));
 
             $items.exit()
                 .remove();

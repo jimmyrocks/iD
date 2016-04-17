@@ -7,9 +7,10 @@ iD.Background = function(context) {
         conflationLayer = iD.ConflationLayer(context, dispatch)
             .projection(context.projection),
         mapillaryLayer = iD.MapillaryLayer(context),
-        overlayLayers = [];
+        baseLayer = iD.TileLayer().projection(context.projection),
+        overlayLayers = [],
+        backgroundSources;
 
-    var backgroundSources;
 
     function findSource(id) {
         return _.find(backgroundSources, function(d) {
@@ -17,7 +18,34 @@ iD.Background = function(context) {
         });
     }
 
-    function updateImagery() {
+
+    function background(selection) {
+        var base = selection.selectAll('.layer-background')
+            .data([0]);
+
+        base.enter()
+            .insert('div', '.layer-data')
+            .attr('class', 'layer layer-background');
+
+        base.call(baseLayer);
+
+        var overlays = selection.selectAll('.layer-overlay')
+            .data(overlayLayers, function(d) { return d.source().name(); });
+
+        overlays.enter()
+            .insert('div', '.layer-data')
+            .attr('class', 'layer layer-overlay');
+
+        overlays.each(function(layer) {
+            d3.select(this).call(layer);
+        });
+
+        overlays.exit()
+            .remove();
+    }
+
+
+    background.updateImagery = function() {
         var b = background.baseLayerSource(),
             o = overlayLayers.map(function (d) { return d.source().id; }).join(','),
             q = iD.util.stringQs(location.hash.substring(1));
@@ -50,7 +78,8 @@ iD.Background = function(context) {
             }
         });
 
-        if (background.showsGpxLayer()) {
+        var gpx = context.layers().layer('gpx');
+        if (gpx && gpx.enabled() && gpx.hasGpx()) {
             imageryUsed.push('Local GPX');
         }
 
@@ -127,7 +156,7 @@ iD.Background = function(context) {
 
         baseLayer.source(d);
         dispatch.change();
-        updateImagery();
+        background.updateImagery();
 
         return background;
     };
@@ -227,7 +256,7 @@ iD.Background = function(context) {
             if (layer.source() === d) {
                 overlayLayers.splice(i, 1);
                 dispatch.change();
-                updateImagery();
+                background.updateImagery();
                 return;
             }
         }
@@ -239,7 +268,7 @@ iD.Background = function(context) {
 
         overlayLayers.push(layer);
         dispatch.change();
-        updateImagery();
+        background.updateImagery();
     };
 
     background.nudge = function(d, zoom) {
@@ -256,6 +285,18 @@ iD.Background = function(context) {
     };
 
     background.load = function(imagery) {
+        function parseMap(qmap) {
+            if (!qmap) return false;
+            var args = qmap.split('/').map(Number);
+            if (args.length < 3 || args.some(isNaN)) return false;
+            return iD.geo.Extent([args[1], args[2]]);
+        }
+
+        var q = iD.util.stringQs(location.hash.substring(1)),
+            chosen = q.background || q.layer,
+            extent = parseMap(q.map),
+            best;
+
         backgroundSources = imagery.map(function(source) {
             if (source.type === 'bing') {
                 return iD.BackgroundSource.Bing(source, dispatch);
@@ -266,13 +307,14 @@ iD.Background = function(context) {
 
         backgroundSources.unshift(iD.BackgroundSource.None());
 
-        var q = iD.util.stringQs(location.hash.substring(1)),
-            chosen = q.background || q.layer;
+        if (!chosen && extent) {
+            best = _.find(this.sources(extent), function(s) { return s.best(); });
+        }
 
         if (chosen && chosen.indexOf('custom:') === 0) {
             background.baseLayerSource(iD.BackgroundSource.Custom(chosen.replace(/^custom:/, '')));
         } else {
-            background.baseLayerSource(findSource(chosen) || findSource('Bing') || backgroundSources[1]);
+            background.baseLayerSource(findSource(chosen) || best || findSource('Bing') || backgroundSources[1] || backgroundSources[0]);
         }
 
         var locator = _.find(backgroundSources, function(d) {
@@ -289,12 +331,9 @@ iD.Background = function(context) {
             if (overlay) background.toggleOverlayLayer(overlay);
         });
 
-        var gpx = q.gpx;
-        if (gpx) {
-            d3.text(gpx, function(err, gpxTxt) {
-                gpxLayer.geojson(toGeoJSON.gpx(toDom(gpxTxt)));
-                dispatch.change();
-            });
+        if (q.gpx) {
+            var gpx = context.layers().layer('gpx');
+            if (gpx) { gpx.url(q.gpx); }
         }
     };
 

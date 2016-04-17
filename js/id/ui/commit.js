@@ -1,12 +1,11 @@
 iD.ui.Commit = function(context) {
-    var event = d3.dispatch('cancel', 'save');
+    var dispatch = d3.dispatch('cancel', 'save');
 
     function commit(selection) {
         var changes = context.history().changes(),
             summary = context.history().difference().summary();
 
         function zoomToEntity(change) {
-
             var entity = change.entity;
             if (change.changeType !== 'deleted' &&
                 context.graph().entity(entity.id).geometry(context.graph()) !== 'vertex') {
@@ -20,17 +19,12 @@ iD.ui.Commit = function(context) {
         var header = selection.append('div')
             .attr('class', 'header fillL');
 
-        header.append('button')
-            .attr('class', 'fr')
-            .on('click', event.cancel)
-            .append('span')
-            .attr('class', 'icon close');
-
         header.append('h3')
             .text(t('commit.title'));
 
         var body = selection.append('div')
             .attr('class', 'body');
+
 
         // Comment Section
         var commentSection = body.append('div')
@@ -44,15 +38,74 @@ iD.ui.Commit = function(context) {
             .attr('placeholder', t('commit.description_placeholder'))
             .attr('maxlength', 255)
             .property('value', context.storage('comment') || '')
-            .on('blur.save', function () {
+            .on('input.save', enableDisableSaveButton)
+            .on('change.save', enableDisableSaveButton)
+            .on('input.save', detectForClippy)
+            .on('change.save', detectForClippy)
+            .on('blur.save', function() {
                 context.storage('comment', this.value);
             });
 
+        function enableDisableSaveButton() {
+            d3.selectAll('.save-section .save-button')
+                .attr('disabled', (this.value.length ? null : true));
+        }
+
+        function detectForClippy() {
+            var googleWarning = clippyArea
+               .html('')
+               .selectAll('a')
+               .data(this.value.match(/google/i) ? [true] : []);
+
+            googleWarning.exit().remove();
+
+            googleWarning.enter()
+               .append('a')
+               .attr('target', '_blank')
+               .attr('tabindex', -1)
+               .call(iD.svg.Icon('#icon-alert', 'inline'))
+               .attr('href', t('commit.google_warning_link'))
+               .append('span')
+               .text(t('commit.google_warning'));
+        }
+
         commentField.node().select();
+
+        context.connection().userChangesets(function (err, changesets) {
+            if (err) return;
+
+            var comments = [];
+
+            for (var i = 0; i < changesets.length; i++) {
+                if (changesets[i].tags.comment) {
+                    comments.push({
+                        title: changesets[i].tags.comment,
+                        value: changesets[i].tags.comment
+                    });
+                }
+            }
+
+            commentField.call(d3.combobox().caseSensitive(true).data(comments));
+        });
+
+        var clippyArea = commentSection.append('div')
+            .attr('class', 'clippy-area');
+
+
+        var changeSetInfo = commentSection.append('div')
+            .attr('class', 'changeset-info');
+
+        changeSetInfo.append('a')
+            .attr('target', '_blank')
+            .attr('tabindex', -1)
+            .call(iD.svg.Icon('#icon-out-link', 'inline'))
+            .attr('href', t('commit.about_changeset_comments_link'))
+            .append('span')
+            .text(t('commit.about_changeset_comments'));
 
         // Warnings
         var warnings = body.selectAll('div.warning-section')
-            .data([iD.validate(changes, context.graph())])
+            .data([context.history().validate(changes)])
             .enter()
             .append('div')
             .attr('class', 'modal-section warning-section fillL2')
@@ -73,12 +126,13 @@ iD.ui.Commit = function(context) {
             .on('mouseout', mouseout)
             .on('click', warningClick);
 
-        warningLi.append('span')
-            .attr('class', 'alert icon icon-pre-text');
+        warningLi
+            .call(iD.svg.Icon('#icon-alert', 'pre-text'));
 
-        warningLi.append('strong').text(function(d) {
-            return d.message;
-        });
+        warningLi
+            .append('strong').text(function(d) {
+                return d.message;
+            });
 
         warningLi.filter(function(d) { return d.tooltip; })
             .call(bootstrap.tooltip()
@@ -86,9 +140,10 @@ iD.ui.Commit = function(context) {
                 .placement('top')
             );
 
-        // Save Section
+
+        // Upload Explanation
         var saveSection = body.append('div')
-            .attr('class','modal-section fillL cf');
+            .attr('class','modal-section save-section fillL cf');
 
         var prose = saveSection.append('p')
             .attr('class', 'commit-info')
@@ -102,7 +157,7 @@ iD.ui.Commit = function(context) {
             if (user.image_url) {
                 userLink.append('img')
                     .attr('src', user.image_url)
-                    .attr('class', 'icon icon-pre-text user-icon');
+                    .attr('class', 'icon pre-text user-icon');
             }
 
             userLink.append('a')
@@ -115,11 +170,27 @@ iD.ui.Commit = function(context) {
             prose.html(t('commit.upload_explanation_with_user', {user: userLink.html()}));
         });
 
-        // Confirm Button
-        var saveButton = saveSection.append('button')
-            .attr('class', 'action col6 button')
+
+        // Buttons
+        var buttonSection = saveSection.append('div')
+            .attr('class','buttons fillL cf');
+
+        var cancelButton = buttonSection.append('button')
+            .attr('class', 'secondary-action col5 button cancel-button')
+            .on('click.cancel', function() { dispatch.cancel(); });
+
+        cancelButton.append('span')
+            .attr('class', 'label')
+            .text(t('commit.cancel'));
+
+        var saveButton = buttonSection.append('button')
+            .attr('class', 'action col5 button save-button')
+            .attr('disabled', function() {
+                var n = d3.select('.commit-form textarea').node();
+                return (n && n.value.length) ? null : true;
+            })
             .on('click.save', function() {
-                event.save({
+                dispatch.save({
                     comment: commentField.node().value
                 });
             });
@@ -128,6 +199,8 @@ iD.ui.Commit = function(context) {
             .attr('class', 'label')
             .text(t('commit.save'));
 
+
+        // Changes
         var changeSection = body.selectAll('div.commit-section')
             .data([0])
             .enter()
@@ -147,10 +220,10 @@ iD.ui.Commit = function(context) {
             .on('mouseout', mouseout)
             .on('click', zoomToEntity);
 
-        li.append('span')
-            .attr('class', function(d) {
-                return d.entity.geometry(d.graph) + ' ' + d.changeType + ' icon icon-pre-text';
-            });
+        li.each(function(d) {
+            d3.select(this)
+                .call(iD.svg.Icon('#icon-' + d.entity.geometry(d.graph), 'pre-text ' + d.changeType));
+        });
 
         li.append('span')
             .attr('class', 'change-type')
@@ -177,9 +250,6 @@ iD.ui.Commit = function(context) {
             .transition()
             .style('opacity', 1);
 
-        li.style('opacity', 0)
-            .transition()
-            .style('opacity', 1);
 
         function mouseover(d) {
             if (d.entity) {
@@ -202,7 +272,12 @@ iD.ui.Commit = function(context) {
                         .suppressMenu(true));
             }
         }
+
+        // Call the enableDisableSaveButton and detectForClippy methods
+        // off the bat, in case a changeset comment is recovered from
+        // localStorage
+        commentField.trigger('input');
     }
 
-    return d3.rebind(commit, event, 'on');
+    return d3.rebind(commit, dispatch, 'on');
 };

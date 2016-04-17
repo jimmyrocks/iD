@@ -1,12 +1,17 @@
-iD.Connection = function() {
+iD.Connection = function(useHttps) {
+    if (typeof useHttps !== 'boolean') {
+      useHttps = window.location.protocol === 'https:';
+    }
+
     var event = d3.dispatch('authenticating', 'authenticated', 'auth', 'loading', 'loaded'),
-        url = 'http://www.openstreetmap.org',
+        protocol = useHttps ? 'https:' : 'http:',
+        url = protocol + '//www.openstreetmap.org',
         connection = {},
         inflight = {},
         loadedTiles = {},
         tileZoom = 16,
         oauth = osmAuth({
-            url: 'http://www.openstreetmap.org',
+            url: protocol + '//www.openstreetmap.org',
             oauth_consumer_key: '5A043yRSEugj4DJ5TljuapfnrflWDte8jTOcWLlT',
             oauth_secret: 'aB3jKq1TRsCOUrfOIZ6oQMEDmv2ptV76PA54NGLL',
             loading: authenticating,
@@ -60,21 +65,23 @@ iD.Connection = function() {
             });
     };
 
-    connection.loadMultiple = function(ids, callback) {
-        // TODO: upgrade lodash and just use _.chunk
-        function chunk(arr, chunkSize) {
-            var result = [];
-            for (var i = 0; i < arr.length; i += chunkSize) {
-                result.push(arr.slice(i, i + chunkSize));
-            }
-            return result;
-        }
+    connection.loadEntityVersion = function(id, version, callback) {
+        var type = iD.Entity.id.type(id),
+            osmID = iD.Entity.id.toOSM(id);
 
+        connection.loadFromURL(
+            url + '/api/0.6/' + type + '/' + osmID + '/' + version,
+            function(err, entities) {
+                if (callback) callback(err, {data: entities});
+            });
+    };
+
+    connection.loadMultiple = function(ids, callback) {
         _.each(_.groupBy(_.uniq(ids), iD.Entity.id.type), function(v, k) {
             var type = k + 's',
                 osmIDs = _.map(v, iD.Entity.id.toOSM);
 
-            _.each(chunk(osmIDs, 150), function(arr) {
+            _.each(_.chunk(osmIDs, 150), function(arr) {
                 connection.loadFromURL(
                     url + '/api/0.6/' + type + '?' + type + '=' + arr.join(),
                     function(err, entities) {
@@ -203,7 +210,7 @@ iD.Connection = function() {
                     tag: _.map(tags, function(value, key) {
                         return { '@k': key, '@v': value };
                     }),
-                    '@version': 0.3,
+                    '@version': 0.6,
                     '@generator': 'iD'
                 }
             }
@@ -233,7 +240,7 @@ iD.Connection = function() {
 
         return {
             osmChange: {
-                '@version': 0.3,
+                '@version': 0.6,
                 '@generator': 'iD',
                 'create': nest(changes.created.map(rep), ['node', 'way', 'relation']),
                 'modify': nest(changes.modified.map(rep), ['node', 'way', 'relation']),
@@ -248,7 +255,7 @@ iD.Connection = function() {
                 created_by: 'iD ' + iD.version,
                 imagery_used: imageryUsed.join(';').substr(0, 255),
                 host: (window.location.origin + window.location.pathname).substr(0, 255),
-                locale: detected.locale,
+                locale: detected.locale
             };
 
         if (comment) {
@@ -274,12 +281,13 @@ iD.Connection = function() {
                 }, function(err) {
                     if (err) return callback(err);
                     // POST was successful, safe to call the callback.
-                    // Still attempt to close changeset, but ignore response.
-                    // see #2667
-                    callback(null, changeset_id);
+                    // Still attempt to close changeset, but ignore response because #2667
+                    // Add delay to allow for postgres replication #1646 #2678
+                    window.setTimeout(function() { callback(null, changeset_id); }, 2500);
                     oauth.xhr({
                         method: 'PUT',
-                        path: '/api/0.6/changeset/' + changeset_id + '/close'
+                        path: '/api/0.6/changeset/' + changeset_id + '/close',
+                        options: { header: { 'Content-Type': 'text/xml' } }
                     }, d3.functor(true));
                 });
             });
@@ -312,6 +320,23 @@ iD.Connection = function() {
         }
 
         oauth.xhr({ method: 'GET', path: '/api/0.6/user/details' }, done);
+    };
+
+    connection.userChangesets = function(callback) {
+        connection.userDetails(function(err, user) {
+            if (err) return callback(err);
+
+            function done(changesets) {
+                callback(undefined, Array.prototype.map.call(changesets.getElementsByTagName('changeset'),
+                    function (changeset) {
+                        return { tags: getTags(changeset) };
+                    }));
+            }
+
+            d3.xml(url + '/api/0.6/changesets?user=' + user.id).get()
+                .on('load', done)
+                .on('error', callback);
+        });
     };
 
     connection.status = function(callback) {

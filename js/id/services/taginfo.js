@@ -1,4 +1,4 @@
-iD.taginfo = function() {
+iD.services.taginfo = function() {
     var taginfo = {},
         endpoint = 'https://taginfo.openstreetmap.org/api/4/',
         tag_sorts = {
@@ -14,11 +14,6 @@ iD.taginfo = function() {
             line: 'ways'
         };
 
-    if (!iD.taginfo.cache) {
-        iD.taginfo.cache = {};
-    }
-
-    var cache = iD.taginfo.cache;
 
     function sets(parameters, n, o) {
         if (parameters.geometry && o[parameters.geometry]) {
@@ -39,37 +34,42 @@ iD.taginfo = function() {
         return _.omit(parameters, 'geometry', 'debounce');
     }
 
-    function shorten(parameters) {
-        if (!parameters.query) {
-            delete parameters.query;
-        } else {
-            parameters.query = parameters.query.slice(0, 3);
-        }
-        return parameters;
-    }
-
     function popularKeys(parameters) {
         var pop_field = 'count_all';
         if (parameters.filter) pop_field = 'count_' + parameters.filter;
-        return function(d) { return parseFloat(d[pop_field]) > 10000; };
+        return function(d) { return parseFloat(d[pop_field]) > 5000 || d.in_wiki; };
     }
 
     function popularValues() {
         return function(d) { return parseFloat(d.fraction) > 0.01 || d.in_wiki; };
     }
 
-    function valKey(d) { return { value: d.key }; }
+    function valKey(d) {
+        return {
+            value: d.key,
+            title: d.key
+        };
+    }
 
     function valKeyDescription(d) {
         return {
             value: d.value,
-            title: d.description
+            title: d.description || d.value
         };
+    }
+
+    // sort keys with ':' lower than keys without ':'
+    function sortKeys(a, b) {
+        return (a.key.indexOf(':') === -1 && b.key.indexOf(':') !== -1) ? -1
+            : (a.key.indexOf(':') !== -1 && b.key.indexOf(':') === -1) ? 1
+            : 0;
     }
 
     var debounced = _.debounce(d3.json, 100, true);
 
     function request(url, debounce, callback) {
+        var cache = iD.services.taginfo.cache;
+
         if (cache[url]) {
             callback(null, cache[url]);
         } else if (debounce) {
@@ -86,7 +86,7 @@ iD.taginfo = function() {
 
     taginfo.keys = function(parameters, callback) {
         var debounce = parameters.debounce;
-        parameters = clean(shorten(setSort(parameters)));
+        parameters = clean(setSort(parameters));
         request(endpoint + 'keys/all?' +
             iD.util.qsString(_.extend({
                 rp: 10,
@@ -95,13 +95,13 @@ iD.taginfo = function() {
                 page: 1
             }, parameters)), debounce, function(err, d) {
                 if (err) return callback(err);
-                callback(null, d.data.filter(popularKeys(parameters)).map(valKey));
+                callback(null, d.data.filter(popularKeys(parameters)).sort(sortKeys).map(valKey));
             });
     };
 
     taginfo.values = function(parameters, callback) {
         var debounce = parameters.debounce;
-        parameters = clean(shorten(setSort(setFilter(parameters))));
+        parameters = clean(setSort(setFilter(parameters)));
         request(endpoint + 'key/values?' +
             iD.util.qsString(_.extend({
                 rp: 25,
@@ -122,8 +122,10 @@ iD.taginfo = function() {
         if (parameters.value) path = 'tag/wiki_pages?';
         else if (parameters.rtype) path = 'relation/wiki_pages?';
 
-        request(endpoint + path +
-            iD.util.qsString(parameters), debounce, callback);
+        request(endpoint + path + iD.util.qsString(parameters), debounce, function(err, d) {
+            if (err) return callback(err);
+            callback(null, d.data);
+        });
     };
 
     taginfo.endpoint = function(_) {
@@ -131,6 +133,16 @@ iD.taginfo = function() {
         endpoint = _;
         return taginfo;
     };
+
+    taginfo.reset = function() {
+        iD.services.taginfo.cache = {};
+        return taginfo;
+    };
+
+
+    if (!iD.services.taginfo.cache) {
+        taginfo.reset();
+    }
 
     return taginfo;
 };

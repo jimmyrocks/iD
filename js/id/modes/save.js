@@ -12,8 +12,14 @@ iD.modes.Save = function(context) {
             return _.uniq(_.reduce(ids, function(result, id) {
                 var e = graph.entity(id);
                 if (e.type === 'way') {
-                    var cn = graph.childNodes(e);
-                    result.push.apply(result, _.pluck(_.filter(cn, 'version'), 'id'));
+                    try {
+                        var cn = graph.childNodes(e);
+                        result.push.apply(result, _.pluck(_.filter(cn, 'version'), 'id'));
+                    } catch(err) {
+                        /* eslint-disable no-console */
+                        if (typeof console !== 'undefined') console.error(err);
+                        /* eslint-enable no-console */
+                    }
                 }
                 return result;
             }, _.clone(ids)));
@@ -165,9 +171,13 @@ iD.modes.Save = function(context) {
                                 });
                                 showErrors();
                             } else {
-                                loading.close();
-                                context.flush();
+                                history.clearSaved();
                                 success(e, changeset_id);
+                                // Add delay to allow for postgres replication #1646 #2678
+                                window.setTimeout(function() {
+                                    loading.close();
+                                    context.flush();
+                                }, 2500);
                             }
                         });
                 } else {        // changes were insignificant or reverted by user
@@ -293,8 +303,8 @@ iD.modes.Save = function(context) {
                     id: changeset_id,
                     comment: e.comment
                 })
-                .on('cancel', function(ui) {
-                    context.ui().sidebar.hide(ui);
+                .on('cancel', function() {
+                    context.ui().sidebar.hide();
                 })));
     }
 
@@ -303,13 +313,17 @@ iD.modes.Save = function(context) {
     };
 
     mode.enter = function() {
-        context.connection().authenticate(function() {
-            context.ui().sidebar.show(ui);
+        context.connection().authenticate(function(err) {
+            if (err) {
+                cancel();
+            } else {
+                context.ui().sidebar.show(ui);
+            }
         });
     };
 
     mode.exit = function() {
-        context.ui().sidebar.hide(ui);
+        context.ui().sidebar.hide();
     };
 
     return mode;

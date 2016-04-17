@@ -1,9 +1,11 @@
 iD.ui.MapData = function(context) {
     var key = 'F',
         features = context.features().keys(),
+        layers = context.layers(),
         fills = ['wireframe', 'partial', 'full'],
         fillDefault = context.storage('area-fill') || 'partial',
         fillSelected = fillDefault;
+
 
     function map_data(selection) {
 
@@ -37,14 +39,102 @@ iD.ui.MapData = function(context) {
             update();
         }
 
-        function clickGpx() {
-            context.background().toggleGpxLayer();
-            update();
+        function toggleLayer(which) {
+            var layer = layers.layer(which);
+            if (layer) {
+                layer.enabled(!layer.enabled());
+                update();
+            }
         }
 
-        function clickMapillary() {
-            context.background().toggleMapillaryLayer();
-            update();
+        function clickGpx() {
+            toggleLayer('gpx');
+        }
+
+        function clickMapillaryImages() {
+            toggleLayer('mapillary-images');
+        }
+
+        function clickMapillarySigns() {
+            toggleLayer('mapillary-signs');
+        }
+
+
+        function drawMapillaryItems(selection) {
+            var mapillaryImages = layers.layer('mapillary-images'),
+                mapillarySigns = layers.layer('mapillary-signs'),
+                supportsMapillaryImages = mapillaryImages && mapillaryImages.supported(),
+                supportsMapillarySigns = mapillarySigns && mapillarySigns.supported(),
+                showsMapillaryImages = supportsMapillaryImages && mapillaryImages.enabled(),
+                showsMapillarySigns = supportsMapillarySigns && mapillarySigns.enabled();
+
+            var mapillaryList = selection
+                .selectAll('.layer-list-mapillary')
+                .data([0]);
+
+            // Enter
+            mapillaryList
+                .enter()
+                .append('ul')
+                .attr('class', 'layer-list layer-list-mapillary');
+
+            var mapillaryImageLayerItem = mapillaryList
+                .selectAll('.list-item-mapillary-images')
+                .data(supportsMapillaryImages ? [0] : []);
+
+            var enterImages = mapillaryImageLayerItem.enter()
+                .append('li')
+                .attr('class', 'list-item-mapillary-images');
+
+            var labelImages = enterImages.append('label')
+                .call(bootstrap.tooltip()
+                    .title(t('mapillary_images.tooltip'))
+                    .placement('top'));
+
+            labelImages.append('input')
+                .attr('type', 'checkbox')
+                .on('change', clickMapillaryImages);
+
+            labelImages.append('span')
+                .text(t('mapillary_images.title'));
+
+
+            var mapillarySignLayerItem = mapillaryList
+                .selectAll('.list-item-mapillary-signs')
+                .data(supportsMapillarySigns ? [0] : []);
+
+            var enterSigns = mapillarySignLayerItem.enter()
+                .append('li')
+                .attr('class', 'list-item-mapillary-signs');
+
+            var labelSigns = enterSigns.append('label')
+                .call(bootstrap.tooltip()
+                    .title(t('mapillary_signs.tooltip'))
+                    .placement('top'));
+
+            labelSigns.append('input')
+                .attr('type', 'checkbox')
+                .on('change', clickMapillarySigns);
+
+            labelSigns.append('span')
+                .text(t('mapillary_signs.title'));
+
+            // Update
+            mapillaryImageLayerItem
+                .classed('active', showsMapillaryImages)
+                .selectAll('input')
+                .property('checked', showsMapillaryImages);
+
+            mapillarySignLayerItem
+                .classed('active', showsMapillarySigns)
+                .selectAll('input')
+                .property('checked', showsMapillarySigns);
+
+            // Exit
+            mapillaryImageLayerItem.exit()
+                .remove();
+            mapillarySignLayerItem.exit()
+                .remove();
         }
 
         function clickConflation() {
@@ -52,12 +142,79 @@ iD.ui.MapData = function(context) {
             update();
         }
 
+        function drawGpxItem(selection) {
+            var gpx = layers.layer('gpx'),
+                hasGpx = gpx && gpx.hasGpx(),
+                showsGpx = hasGpx && gpx.enabled();
+
+            var gpxLayerItem = selection
+                .selectAll('.layer-list-gpx')
+                .data(gpx ? [0] : []);
+
+            // Enter
+            var enter = gpxLayerItem.enter()
+                .append('ul')
+                .attr('class', 'layer-list layer-list-gpx')
+                .append('li')
+                .classed('list-item-gpx', true);
+
+            enter.append('button')
+                .attr('class', 'list-item-gpx-extent')
+                .call(bootstrap.tooltip()
+                    .title(t('gpx.zoom'))
+                    .placement('left'))
+                .on('click', function() {
+                    d3.event.preventDefault();
+                    d3.event.stopPropagation();
+                    gpx.fitZoom();
+                })
+                .call(iD.svg.Icon('#icon-search'));
+
+            enter.append('button')
+                .attr('class', 'list-item-gpx-browse')
+                .call(bootstrap.tooltip()
+                    .title(t('gpx.browse'))
+                    .placement('left'))
+                .on('click', function() {
+                    d3.select(document.createElement('input'))
+                        .attr('type', 'file')
+                        .on('change', function() {
+                            gpx.files(d3.event.target.files);
+                        })
+                        .node().click();
+                })
+                .call(iD.svg.Icon('#icon-geolocate'));
+
+            var labelGpx = enter.append('label')
+                .call(bootstrap.tooltip()
+                    .title(t('gpx.drag_drop'))
+                    .placement('top'));
+
+            labelGpx.append('input')
+                .attr('type', 'checkbox')
+                .on('change', clickGpx);
+
+            labelGpx.append('span')
+                .text(t('gpx.local_layer'));
+
+            // Update
+            gpxLayerItem
+                .classed('active', showsGpx)
+                .selectAll('input')
+                .property('disabled', !hasGpx)
+                .property('checked', showsGpx);
+
+            // Exit
+            gpxLayerItem.exit()
+                .remove();
+        }
+
 
         function drawList(selection, data, type, name, change, active) {
             var items = selection.selectAll('li')
                 .data(data);
 
-            //enter
+            // Enter
             var enter = items.enter()
                 .append('li')
                 .attr('class', 'layer')
@@ -85,7 +242,7 @@ iD.ui.MapData = function(context) {
             label.append('span')
                 .text(function(d) { return t(name + '.' + d + '.description'); });
 
-            //update
+            // Update
             items
                 .classed('active', active)
                 .selectAll('input')
@@ -94,25 +251,22 @@ iD.ui.MapData = function(context) {
                     return (name === 'feature' && autoHiddenFeature(d));
                 });
 
-            //exit
+            // Exit
             items.exit()
                 .remove();
         }
 
-        function update() {
-            featureList.call(drawList, features, 'checkbox', 'feature', clickFeature, showsFeature);
-            fillList.call(drawList, fills, 'radio', 'area_fill', setFill, showsFill);
 
             var hasGpx = context.background().hasGpxLayer(),
                 showsGpx = context.background().showsGpxLayer(),
                 showsMapillary = context.background().showsMapillaryLayer(),
                 showsConflation = context.background().showsConflationLayer();
+        function update() {
+            dataLayerContainer.call(drawMapillaryItems);
+            dataLayerContainer.call(drawGpxItem);
+        }
 
-            gpxLayerItem
-                .classed('active', showsGpx)
-                .selectAll('input')
-                .property('disabled', !hasGpx)
-                .property('checked', showsGpx);
+            fillList.call(drawList, fills, 'radio', 'area_fill', setFill, showsFill);
 
             mapillaryLayerItem
                 .classed('active', showsMapillary)
@@ -124,9 +278,12 @@ iD.ui.MapData = function(context) {
                 .selectAll('input')
                 .property('checked', showsConflation);
 
+            featureList.call(drawList, features, 'checkbox', 'feature', clickFeature, showsFeature);
         }
 
-        function hidePanel() { setVisible(false); }
+        function hidePanel() {
+            setVisible(false);
+        }
 
         function togglePanel() {
             if (d3.event) d3.event.preventDefault();
@@ -149,6 +306,7 @@ iD.ui.MapData = function(context) {
                 shown = show;
 
                 if (show) {
+                    update();
                     selection.on('mousedown.map_data-inside', function() {
                         return d3.event.stopPropagation();
                     });
@@ -181,11 +339,9 @@ iD.ui.MapData = function(context) {
             button = selection.append('button')
                 .attr('tabindex', -1)
                 .on('click', togglePanel)
+                .call(iD.svg.Icon('#icon-data', 'light'))
                 .call(tooltip),
             shown = false;
-
-        button.append('span')
-            .attr('class', 'icon data light');
 
         content.append('h4')
             .text(t('map_data.title'));
@@ -199,13 +355,13 @@ iD.ui.MapData = function(context) {
             .classed('expanded', true)
             .on('click', function() {
                 var exp = d3.select(this).classed('expanded');
-                layerContainer.style('display', exp ? 'none' : 'block');
+                dataLayerContainer.style('display', exp ? 'none' : 'block');
                 d3.select(this).classed('expanded', !exp);
                 d3.event.preventDefault();
             });
 
-        var layerContainer = content.append('div')
-            .attr('class', 'filters')
+        var dataLayerContainer = content.append('div')
+            .attr('class', 'data-data-layers')
             .style('display', 'block');
 
         // mapillary
@@ -306,11 +462,11 @@ iD.ui.MapData = function(context) {
             });
 
         var fillContainer = content.append('div')
-            .attr('class', 'filters')
+            .attr('class', 'data-area-fills')
             .style('display', 'none');
 
         var fillList = fillContainer.append('ul')
-            .attr('class', 'layer-list');
+            .attr('class', 'layer-list layer-fill-list');
 
 
         // feature filters
@@ -327,11 +483,11 @@ iD.ui.MapData = function(context) {
             });
 
         var featureContainer = content.append('div')
-            .attr('class', 'filters')
+            .attr('class', 'data-feature-filters')
             .style('display', 'none');
 
         var featureList = featureContainer.append('ul')
-            .attr('class', 'layer-list');
+            .attr('class', 'layer-list layer-feature-list');
 
 
         context.features()

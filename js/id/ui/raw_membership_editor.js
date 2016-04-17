@@ -67,6 +67,19 @@ iD.ui.RawMembershipEditor = function(context) {
         result.sort(function(a, b) {
             return iD.Relation.creationOrder(a.relation, b.relation);
         });
+
+        // Dedupe identical names by appending relation id - see #2891
+        var dupeGroups = _(result)
+            .groupBy('value')
+            .filter(function(v) { return v.length > 1; })
+            .value();
+
+        dupeGroups.forEach(function(group) {
+            group.forEach(function(obj) {
+                obj.value += ' ' + obj.relation.id;
+            });
+        });
+
         result.unshift(newRelation);
 
         return result;
@@ -135,8 +148,7 @@ iD.ui.RawMembershipEditor = function(context) {
                 .attr('tabindex', -1)
                 .attr('class', 'remove button-input-action member-delete minor')
                 .on('click', deleteMembership)
-                .append('span')
-                .attr('class', 'icon delete');
+                .call(iD.svg.Icon('#operation-delete'));
 
             $items.exit()
                 .remove();
@@ -171,8 +183,7 @@ iD.ui.RawMembershipEditor = function(context) {
                     .attr('tabindex', -1)
                     .attr('class', 'remove button-input-action member-delete minor')
                     .on('click', deleteMembership)
-                    .append('span')
-                    .attr('class', 'icon delete');
+                    .call(iD.svg.Icon('#operation-delete'));
 
             } else {
                 $list.selectAll('.member-row-new')
@@ -182,10 +193,10 @@ iD.ui.RawMembershipEditor = function(context) {
             var $add = $wrap.selectAll('.add-relation')
                 .data([0]);
 
-            $add.enter().append('button')
+            $add.enter()
+                .append('button')
                 .attr('class', 'add-relation')
-                .append('span')
-                .attr('class', 'icon plus light');
+                .call(iD.svg.Icon('#icon-plus', 'light'));
 
             $wrap.selectAll('.add-relation')
                 .on('click', function() {

@@ -2,21 +2,29 @@ iD.ui.Background = function(context) {
     var key = 'B',
         opacities = [1, 0.75, 0.5, 0.25],
         directions = [
-            ['left', [1, 0]],
-            ['top', [0, -1]],
-            ['right', [-1, 0]],
-            ['bottom', [0, 1]]],
+            ['right', [0.5, 0]],
+            ['top', [0, -0.5]],
+            ['left', [-0.5, 0]],
+            ['bottom', [0, 0.5]]],
         opacityDefault = (context.storage('background-opacity') !== null) ?
-            (+context.storage('background-opacity')) : 0.5,
+            (+context.storage('background-opacity')) : 1.0,
         customTemplate = context.storage('background-custom-template') || '';
 
     // Can be 0 from <1.3.0 use or due to issue #1923.
-    if (opacityDefault === 0) opacityDefault = 0.5;
+    if (opacityDefault === 0) opacityDefault = 1.0;
 
     function background(selection) {
 
+        function sortSources(a, b) {
+            return a.best() ? -1
+                : b.best() ? 1
+                : a.id === 'none' ? 1
+                : b.id === 'none' ? -1
+                : d3.ascending(a, b);
+        }
+
         function setOpacity(d) {
-            var bg = context.container().selectAll('.background-layer')
+            var bg = context.container().selectAll('.layer-background')
                 .transition()
                 .style('opacity', d)
                 .attr('data-opacity', d);
@@ -79,17 +87,28 @@ iD.ui.Background = function(context) {
                 .filter(filter);
 
             var layerLinks = layerList.selectAll('li.layer')
-                .data(sources, function(d) { return d.name(); });
+                .data(sources, function(d) { return d.name(); })
+                .sort(sortSources);
 
             var enter = layerLinks.enter()
                 .insert('li', '.custom_layer')
-                .attr('class', 'layer');
+                .attr('class', 'layer')
+                .classed('best', function(d) { return d.best(); });
 
             // only set tooltips for layers with tooltips
             enter.filter(function(d) { return d.description; })
                 .call(bootstrap.tooltip()
                     .title(function(d) { return d.description; })
                     .placement('top'));
+
+            enter.filter(function(d) { return d.best(); })
+                .append('div')
+                .attr('class', 'best')
+                .call(bootstrap.tooltip()
+                    .title(t('background.best_imagery'))
+                    .placement('left'))
+                .append('span')
+                .html('&#9733;');
 
             var label = enter.append('label');
 
@@ -117,30 +136,119 @@ iD.ui.Background = function(context) {
             if (source.id === 'custom') {
                 customTemplate = source.template;
             }
+
+            updateOffsetVal();
         }
 
-        function clickNudge(d) {
+        function offsetToMeters(offset) {
+            var equatRadius = 6356752.314245179,
+                polarRadius = 6378137.0,
+                tileSize = 256;
 
+            return [
+                offset[0] * 2 * Math.PI * equatRadius / tileSize,
+                -offset[1] * 2 * Math.PI * polarRadius / tileSize
+            ];
+        }
+
+        function metersToOffset(meters) {
+            var equatRadius = 6356752.314245179,
+                polarRadius = 6378137.0,
+                tileSize = 256;
+
+            return [
+                meters[0] * tileSize / (2 * Math.PI * equatRadius),
+                -meters[1] * tileSize / (2 * Math.PI * polarRadius)
+            ];
+        }
+
+        function updateOffsetVal() {
+            var meters = offsetToMeters(context.background().offset()),
+                x = +meters[0].toFixed(2),
+                y = +meters[1].toFixed(2);
+
+            d3.selectAll('.nudge-inner-rect')
+                .select('input')
+                .classed('error', false)
+                .property('value', x + ', ' + y);
+
+            d3.selectAll('.nudge-reset')
+                .classed('disabled', function() {
+                    return (x === 0 && y === 0);
+                });
+        }
+
+        function resetOffset() {
+            context.background().offset([0, 0]);
+            updateOffsetVal();
+        }
+
+        function nudge(d) {
+            context.background().nudge(d, context.map().zoom());
+            updateOffsetVal();
+        }
+
+        function buttonOffset(d) {
             var timeout = window.setTimeout(function() {
-                    interval = window.setInterval(nudge, 100);
+                    interval = window.setInterval(nudge.bind(null, d), 100);
                 }, 500),
                 interval;
 
-            d3.select(this).on('mouseup', function() {
+            d3.select(window).on('mouseup', function() {
                 window.clearInterval(interval);
                 window.clearTimeout(timeout);
-                nudge();
+                d3.select(window).on('mouseup', null);
             });
 
-            function nudge() {
-                var offset = context.background()
-                    .nudge(d[1], context.map().zoom())
-                    .offset();
-                resetButton.classed('disabled', offset[0] === 0 && offset[1] === 0);
-            }
+            nudge(d);
         }
 
-        function hide() { setVisible(false); }
+        function inputOffset() {
+            var input = d3.select(this);
+            var d = input.node().value;
+
+            if (d === '') return resetOffset();
+
+            d = d.replace(/;/g, ',').split(',').map(function(n) {
+                // if n is NaN, it will always get mapped to false.
+                return !isNaN(n) && n;
+            });
+
+            if (d.length !== 2 || !d[0] || !d[1]) {
+                input.classed('error', true);
+                return;
+            }
+
+            context.background().offset(metersToOffset(d));
+            updateOffsetVal();
+        }
+
+        function dragOffset() {
+            var origin = [d3.event.clientX, d3.event.clientY];
+
+            d3.select(window)
+                .on('mousemove.offset', function() {
+                    var latest = [d3.event.clientX, d3.event.clientY];
+                    var d = [
+                        -(origin[0] - latest[0]) / 4,
+                        -(origin[1] - latest[1]) / 4
+                    ];
+
+                    origin = latest;
+                    nudge(d);
+                })
+                .on('mouseup.offset', function() {
+                    d3.select(window)
+                        .on('mousemove.offset', null)
+                        .on('mouseup.offset', null);
+                });
+
+            d3.event.preventDefault();
+        }
+
+        function hide() {
+            setVisible(false);
+        }
 
         function toggle() {
             if (d3.event) d3.event.preventDefault();
@@ -186,12 +294,12 @@ iD.ui.Background = function(context) {
             button = selection.append('button')
                 .attr('tabindex', -1)
                 .on('click', toggle)
+                .call(iD.svg.Icon('#icon-layers', 'light'))
                 .call(tooltip),
             shown = false;
 
-        button.append('span')
-            .attr('class', 'icon layers light');
 
+        /* opacity switcher */
 
         var opa = content.append('div')
                 .attr('class', 'opacity-options-wrapper');
@@ -217,6 +325,9 @@ iD.ui.Background = function(context) {
             .attr('class', 'opacity')
             .style('opacity', function(d) { return 1.25 - d; });
 
+
+        /* background switcher */
+
         var backgroundList = content.append('ul')
             .attr('class', 'layer-list');
 
@@ -230,8 +341,7 @@ iD.ui.Background = function(context) {
                 .title(t('background.custom_button'))
                 .placement('left'))
             .on('click', editCustom)
-            .append('span')
-            .attr('class', 'icon geocode');
+            .call(iD.svg.Icon('#icon-search'));
 
         var label = custom.append('label');
 
@@ -249,8 +359,46 @@ iD.ui.Background = function(context) {
         label.append('span')
             .text(t('background.custom'));
 
+        content.append('div')
+            .attr('class', 'imagery-faq')
+            .append('a')
+            .attr('target', '_blank')
+            .attr('tabindex', -1)
+            .call(iD.svg.Icon('#icon-out-link', 'inline'))
+            .attr('href', 'https://github.com/openstreetmap/iD/blob/master/FAQ.md#how-can-i-report-an-issue-with-background-imagery')
+            .append('span')
+            .text(t('background.imagery_source_faq'));
+
         var overlayList = content.append('ul')
             .attr('class', 'layer-list');
+
+        var controls = content.append('div')
+            .attr('class', 'controls-list');
+
+
+        /* minimap toggle */
+
+        var minimapLabel = controls
+            .append('label')
+            .call(bootstrap.tooltip()
+                .html(true)
+                .title(iD.ui.tooltipHtml(t('background.minimap.tooltip'), '/'))
+                .placement('top')
+            );
+
+        minimapLabel.classed('minimap-toggle', true)
+            .append('input')
+            .attr('type', 'checkbox')
+            .on('change', function() {
+                iD.ui.MapInMap.toggle();
+                d3.event.preventDefault();
+            });
+
+        minimapLabel.append('span')
+            .text(t('background.minimap.description'));
+
+
+        /* imagery offset controls */
 
         var adjustments = content.append('div')
             .attr('class', 'adjustments');
@@ -271,27 +419,43 @@ iD.ui.Background = function(context) {
             .attr('class', 'nudge-container cf')
             .style('display', 'none');
 
-        nudgeContainer.selectAll('button')
+        nudgeContainer.append('div')
+            .attr('class', 'nudge-instructions')
+            .text(t('background.offset'));
+
+        var nudgeRect = nudgeContainer.append('div')
+            .attr('class', 'nudge-outer-rect')
+            .on('mousedown', dragOffset);
+
+        nudgeRect.append('div')
+            .attr('class', 'nudge-inner-rect')
+            .append('input')
+            .on('change', inputOffset)
+            .on('mousedown', function() {
+                d3.event.stopPropagation();
+            });
+
+        nudgeContainer.append('div')
+            .selectAll('button')
             .data(directions).enter()
             .append('button')
             .attr('class', function(d) { return d[0] + ' nudge'; })
-            .on('mousedown', clickNudge);
-
-        var resetButton = nudgeContainer.append('button')
-            .attr('class', 'reset disabled')
-            .on('click', function () {
-                context.background().offset([0, 0]);
-                resetButton.classed('disabled', true);
+            .on('mousedown', function(d) {
+                buttonOffset(d[1]);
             });
 
-        resetButton.append('div')
-            .attr('class', 'icon undo');
+        nudgeContainer.append('button')
+            .attr('title', t('background.reset'))
+            .attr('class', 'nudge-reset disabled')
+            .on('click', resetOffset)
+            .call(iD.svg.Icon('#icon-undo'));
 
         context.map()
             .on('move.background-update', _.debounce(update, 1000));
 
         context.background()
             .on('change.background-update', update);
+
 
         update();
         setOpacity(opacityDefault);
